@@ -12,9 +12,11 @@ if MYSQL_PASS:
         f"mysql+pymysql://{MYSQL_USER}:{MYSQL_PASS}@{MYSQL_HOST}:{MYSQL_PORT}/{MYSQL_DB}?charset=utf8mb4"
     )
 else:
-    # sin contraseña -> NO pongas ':'
     SQLALCHEMY_DATABASE_URI = (
         f"mysql+pymysql://{MYSQL_USER}@{MYSQL_HOST}:{MYSQL_PORT}/{MYSQL_DB}?charset=utf8mb4"
     )
 
 SQLALCHEMY_TRACK_MODIFICATIONS = False
+
+NESSIE_BASE_URL = os.getenv("NESSIE_BASE_URL", "http://api.nessieisreal.com")
+NESSIE_API_KEY = os.getenv("NESSIE_API_KEY", "")

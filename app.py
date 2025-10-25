@@ -8,8 +8,10 @@ from models.user import User
 from models.pago import Pago
 from models.historial import Historial
 from models.dinero import Dinero
+from models.nessie_account import NessieAccount
 from ml.model import evaluar_gasto
 from ml.gpt import generar_mensaje_gpt
+from routes import customer_bp, account_bp, transaction_bp
 import os
 import pymysql
 from config import MYSQL_USER, MYSQL_PASS, MYSQL_HOST, MYSQL_PORT, MYSQL_DB
@@ -28,6 +30,10 @@ app = Flask(__name__)
 app.config["SQLALCHEMY_DATABASE_URI"] = SQLALCHEMY_DATABASE_URI
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = SQLALCHEMY_TRACK_MODIFICATIONS
 db.init_app(app)
+
+app.register_blueprint(customer_bp)
+app.register_blueprint(account_bp)
+app.register_blueprint(transaction_bp)
 
 # --- Inicialización de la base y datos iniciales ---
 with app.app_context():
