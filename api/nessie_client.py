@@ -189,3 +189,110 @@ class NessieClient:
 
     def delete_withdrawal(self, withdrawal_id: str) -> None:
         return self._make_request("DELETE", f"/withdrawals/{withdrawal_id}")
+
+    def get_branches(self, lat: Optional[float] = None, lng: Optional[float] = None,
+                    radius: Optional[float] = None) -> List[Dict]:
+        endpoint = "/branches"
+        params = []
+        if lat is not None:
+            params.append(f"lat={lat}")
+        if lng is not None:
+            params.append(f"lng={lng}")
+        if radius is not None:
+            params.append(f"radius={radius}")
+        if params:
+            endpoint += "?" + "&".join(params)
+        return self._make_request("GET", endpoint)
+
+    def get_branch(self, branch_id: str) -> Dict:
+        return self._make_request("GET", f"/branches/{branch_id}")
+
+    def get_account_goals(self, account_id: str) -> List[Dict]:
+        return self._make_request("GET", f"/accounts/{account_id}/goals")
+
+    def get_goal(self, goal_id: str) -> Dict:
+        return self._make_request("GET", f"/goals/{goal_id}")
+
+    def create_goal(self, account_id: str, name: str, amount: float,
+                   description: Optional[str] = None) -> Dict:
+        data = {
+            "name": name,
+            "amount": amount
+        }
+        if description:
+            data["description"] = description
+        return self._make_request("POST", f"/accounts/{account_id}/goals", data)
+
+    def update_goal(self, goal_id: str, data: Dict) -> Dict:
+        return self._make_request("PUT", f"/goals/{goal_id}", data)
+
+    def delete_goal(self, goal_id: str) -> None:
+        return self._make_request("DELETE", f"/goals/{goal_id}")
+
+    def get_applications(self) -> List[Dict]:
+        return self._make_request("GET", "/applications")
+
+    def get_application(self, application_id: str) -> Dict:
+        return self._make_request("GET", f"/applications/{application_id}")
+
+    def create_application(self, applicant_id: str, application_type: str,
+                          initial_deposit: float) -> Dict:
+        data = {
+            "applicant_id": applicant_id,
+            "type": application_type,
+            "initial_deposit": initial_deposit
+        }
+        return self._make_request("POST", "/applications", data)
+
+    def get_merchants(self, lat: Optional[float] = None, lng: Optional[float] = None,
+                     radius: Optional[float] = None) -> List[Dict]:
+        endpoint = "/merchants"
+        params = []
+        if lat is not None:
+            params.append(f"lat={lat}")
+        if lng is not None:
+            params.append(f"lng={lng}")
+        if radius is not None:
+            params.append(f"radius={radius}")
+        if params:
+            endpoint += "?" + "&".join(params)
+        return self._make_request("GET", endpoint)
+
+    def get_merchant(self, merchant_id: str) -> Dict:
+        return self._make_request("GET", f"/merchants/{merchant_id}")
+
+    def create_merchant(self, name: str, category: List[str], address: Dict,
+                       geocode: Optional[Dict] = None) -> Dict:
+        data = {
+            "name": name,
+            "category": category,
+            "address": address
+        }
+        if geocode:
+            data["geocode"] = geocode
+        return self._make_request("POST", "/merchants", data)
+
+    def get_account_purchases(self, account_id: str) -> List[Dict]:
+        return self._make_request("GET", f"/accounts/{account_id}/purchases")
+
+    def get_purchase(self, purchase_id: str) -> Dict:
+        return self._make_request("GET", f"/purchases/{purchase_id}")
+
+    def create_purchase(self, account_id: str, merchant_id: str, medium: str,
+                       amount: float, purchase_date: str,
+                       description: Optional[str] = None) -> Dict:
+        data = {
+            "merchant_id": merchant_id,
+            "medium": medium,
+            "purchase_date": purchase_date,
+            "amount": amount
+        }
+        if description:
+            data["description"] = description
+        return self._make_request("POST", f"/accounts/{account_id}/purchases", data)
+
+    def update_purchase(self, purchase_id: str, data: Dict) -> Dict:
+        return self._make_request("PUT", f"/purchases/{purchase_id}", data)
+
+    def delete_purchase(self, purchase_id: str) -> None:
+        return self._make_request("DELETE", f"/purchases/{purchase_id}")

@@ -11,7 +11,7 @@ from models.dinero import Dinero
 from models.nessie_account import NessieAccount
 from ml.model import evaluar_gasto
 from ml.gpt import generar_mensaje_gpt
-from routes import customer_bp, account_bp, transaction_bp
+from routes import customer_bp, account_bp, transaction_bp, branch_bp, goal_bp, application_bp, merchant_bp, purchase_bp
 import os
 import pymysql
 from config import MYSQL_USER, MYSQL_PASS, MYSQL_HOST, MYSQL_PORT, MYSQL_DB
@@ -34,6 +34,11 @@ db.init_app(app)
 app.register_blueprint(customer_bp)
 app.register_blueprint(account_bp)
 app.register_blueprint(transaction_bp)
+app.register_blueprint(branch_bp)
+app.register_blueprint(goal_bp)
+app.register_blueprint(application_bp)
+app.register_blueprint(merchant_bp)
+app.register_blueprint(purchase_bp)
 
 # --- Inicialización de la base y datos iniciales ---
 with app.app_context():
