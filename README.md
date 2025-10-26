@@ -4,26 +4,26 @@ Sistema backend con inteligencia artificial que ayuda a los usuarios a gestionar
 
 ## Características Principales
 
-- **Evaluación Inteligente de Gastos**: Analiza cada transacción considerando tu saldo, suscripciones activas y patrones de gasto
-- **Recomendaciones Personalizadas**: La IA aprende de tu historial y ofrece consejos específicos para tu situación
-- **Gestión de Pagos**: Registra y controla todos tus pagos con historial completo
-- **Alertas Inteligentes**: Recibe advertencias cuando un gasto puede comprometer tu estabilidad financiera
-- **API REST**: Endpoints completos para integración con cualquier frontend
+-   **Evaluación Inteligente de Gastos**: Analiza cada transacción considerando tu saldo, suscripciones activas y patrones de gasto
+-   **Recomendaciones Personalizadas**: La IA aprende de tu historial y ofrece consejos específicos para tu situación
+-   **Gestión de Pagos**: Registra y controla todos tus pagos con historial completo
+-   **Alertas Inteligentes**: Recibe advertencias cuando un gasto puede comprometer tu estabilidad financiera
+-   **API REST**: Endpoints completos para integración con cualquier frontend
 
 ## Tecnologías
 
-- **Backend**: Flask (Python)
-- **Base de Datos**: MySQL con SQLAlchemy ORM
-- **IA**: OpenAI GPT-4o-mini (con fallback inteligente)
-- **Análisis**: Sistema de evaluación basado en patrones de comportamiento
+-   **Backend**: Flask (Python)
+-   **Base de Datos**: MySQL con SQLAlchemy ORM
+-   **IA**: OpenAI GPT-4o-mini (con fallback inteligente)
+-   **Análisis**: Sistema de evaluación basado en patrones de comportamiento
 
 ## Instalación
 
 ### Requisitos Previos
 
-- Python 3.8 o superior
-- MySQL Server instalado y en ejecución
-- (Opcional) API key de OpenAI para mensajes personalizados con GPT
+-   Python 3.8 o superior
+-   MySQL Server instalado y en ejecución
+-   (Opcional) API key de OpenAI para mensajes personalizados con GPT
 
 ### Paso 1: Clonar el Repositorio
 
@@ -39,8 +39,9 @@ python -m venv venv
 ```
 
 Activar el entorno virtual:
-- **Windows**: `venv\Scripts\activate`
-- **Linux/Mac**: `source venv/bin/activate`
+
+-   **Windows**: `venv\Scripts\activate`
+-   **Linux/Mac**: `source venv/bin/activate`
 
 ### Paso 3: Instalar Dependencias
 
@@ -81,28 +82,31 @@ El servidor estará disponible en: `http://127.0.0.1:5000`
 **Endpoint**: `POST /api/evaluar`
 
 **Body**:
+
 ```json
 {
-  "idUser": 1,
-  "saldo": 4200.00,
-  "suscripciones": 3,
-  "esencial": false,
-  "nuevo_gasto": 1500.00
+    "idUser": 1,
+    "saldo": 4200.0,
+    "suscripciones": 3,
+    "esencial": false,
+    "nuevo_gasto": 1500.0
 }
 ```
 
 **Respuesta con alerta**:
+
 ```json
 {
-  "alerta": true,
-  "mensaje": "⚠️ Este gasto representa el 35.7% de tu saldo. Basándome en tus últimos pagos..."
+    "alerta": true,
+    "mensaje": "⚠️ Este gasto representa el 35.7% de tu saldo. Basándome en tus últimos pagos..."
 }
 ```
 
 **Respuesta sin alerta**:
+
 ```json
 {
-  "alerta": false
+    "alerta": false
 }
 ```
 
@@ -111,20 +115,22 @@ El servidor estará disponible en: `http://127.0.0.1:5000`
 **Endpoint**: `POST /api/pago`
 
 **Body**:
+
 ```json
 {
-  "idUser": 1,
-  "motivo": "Compra de supermercado",
-  "monto": 250.50
+    "idUser": 1,
+    "motivo": "Compra de supermercado",
+    "monto": 250.5
 }
 ```
 
 **Respuesta**:
+
 ```json
 {
-  "mensaje": "Pago registrado con éxito",
-  "nuevo_saldo": 3949.50,
-  "pago_id": 15
+    "mensaje": "Pago registrado con éxito",
+    "nuevo_saldo": 3949.5,
+    "pago_id": 15
 }
 ```
 
@@ -133,12 +139,55 @@ El servidor estará disponible en: `http://127.0.0.1:5000`
 **Endpoint**: `GET /api/saldo/<user_id>`
 
 **Respuesta**:
+
 ```json
 {
-  "idUser": 1,
-  "saldo": 3949.50
+    "idUser": 1,
+    "saldo": 3949.5
 }
 ```
+
+### 4. Crear Nuevo Usuario
+
+**Endpoint**: `POST /api/usuarios`
+
+**Body**:
+
+```json
+{
+    "nombre": "María López",
+    "email": "maria@example.com",
+    "saldo_inicial": 5000.0
+}
+```
+
+**Respuesta**:
+
+```json
+{
+    "mensaje": "Usuario creado exitosamente",
+    "usuario": {
+        "id": 2,
+        "nombre": "María López",
+        "email": "maria@example.com",
+        "saldo": 5000.0
+    }
+}
+```
+
+**Pasos en Postman**:
+
+1. Abrir Postman
+2. Crear una nueva solicitud HTTP:
+    - Método: POST
+    - URL: `http://127.0.0.1:5000/api/usuarios`
+    - Headers:
+        - Content-Type: application/json
+3. En la pestaña "Body":
+    - Seleccionar "raw"
+    - Seleccionar "JSON"
+    - Pegar el JSON de ejemplo mostrado arriba
+4. Hacer clic en "Send"
 
 ## Cómo Funciona la IA
 
@@ -175,23 +224,24 @@ El sistema de inteligencia artificial mejora con cada pago que registras:
 
 Al iniciar la aplicación por primera vez, se crea automáticamente un usuario de prueba:
 
-- **ID**: 1
-- **Nombre**: Carlos Ramírez
-- **Email**: carlos@example.com
-- **Saldo inicial**: $4200.00
+-   **ID**: 1
+-   **Nombre**: Carlos Ramírez
+-   **Email**: carlos@example.com
+-   **Saldo inicial**: $4200.00
 
 ### Extender la IA
 
 Para mejorar el sistema de evaluación, puedes modificar:
 
-- `ml/model.py`: Ajusta los umbrales y lógica de evaluación de riesgo
-- `ml/gpt.py`: Personaliza los prompts y el formato de los mensajes
+-   `ml/model.py`: Ajusta los umbrales y lógica de evaluación de riesgo
+-   `ml/gpt.py`: Personaliza los prompts y el formato de los mensajes
 
 ## Solución de Problemas
 
 ### Error de conexión a MySQL
 
 Verifica que MySQL esté corriendo:
+
 ```bash
 mysql -u root -p
 ```
