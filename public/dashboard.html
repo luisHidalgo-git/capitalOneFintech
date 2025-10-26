@@ -513,8 +513,7 @@
     const pd = await rp.json().catch(()=> ({}));
     if(!rp.ok){ showToast('No se registró', pd.error || 'Error al registrar pago','error'); return; }
 
-    const nuevo = Number(pd.nuevo_saldo);
-    if (!Number.isNaN(nuevo)) $('#totalAmount').textContent = fmt(nuevo);
+    $('#totalAmount').textContent = fmt(pd.nuevo_saldo);
     updateCreditUI(pd.nueva_deuda_credito || 0);
     await loadMovs(MOV_PAGE);
 

@@ -14,6 +14,8 @@ from models.historial import Historial
 from models.dinero import Dinero
 from ml.model import evaluar_gasto
 from ml.gpt import generar_mensaje_gpt
+from services.balance_service import BalanceService
+from services.payment_service import PaymentService
 from sqlalchemy import text
 import os
 import pymysql
@@ -291,12 +293,7 @@ def register():
         db.session.flush()
 
         # Crear saldo inicial
-        dinero = Dinero(
-            saldo=max(0, saldo_inicial),
-            deuda_credito=0,
-            idUser=nuevo_usuario.idUser
-        )
-        db.session.add(dinero)
+        dinero = BalanceService.create_balance(nuevo_usuario.idUser, saldo_inicial)
         db.session.commit()
 
         return jsonify({
@@ -380,141 +377,61 @@ def registrar_pago():
     user, err = require_auth_user()
     if err:
         return err
-    user_id = user.idUser
 
     motivo = (data.get("motivo") or "").strip()
     tipo = (data.get("tipo") or "debito").strip().lower()
     monto = data.get("monto")
+    categoria = data.get("categoria") or None
+    metodo = data.get("metodo") or None
+    referencia = data.get("referencia") or None
+    notas = data.get("notas") or None
 
-    if not motivo or monto is None:
-        return jsonify({"error": "Faltan datos requeridos (motivo, monto)"}), 400
     try:
         monto = float(monto)
-    except Exception:
+    except (TypeError, ValueError):
         return jsonify({"error": "Monto inválido"}), 400
-    if monto <= 0:
-        return jsonify({"error": "Monto inválido"}), 400
-    if tipo not in ("debito", "credito"):
-        return jsonify({"error": "tipo debe ser 'debito' o 'credito'"}), 400
-
-    dinero = Dinero.query.filter_by(idUser=user_id).first()
-    if not dinero:
-        return jsonify({"error": "No hay saldo asociado"}), 404
-
-    # Actualiza saldos según tipo
-    if tipo == "debito":
-        if float(dinero.saldo) < monto:
-            return jsonify({"error": "Saldo insuficiente"}), 400
-        dinero.saldo = float(dinero.saldo) - monto
-    else:
-        dinero.deuda_credito = float(getattr(dinero, "deuda_credito", 0) or 0) + monto
-
-    # Intento 1: con metadata opcional (si el esquema está migrado)
-    categoria  = (data.get("categoria")  or None)
-    metodo     = (data.get("metodo")     or None)
-    referencia = (data.get("referencia") or None)
-    notas      = (data.get("notas")      or None)
 
     try:
-        pago = Pago(
-            idUser=user_id, motivo=motivo, pagoFecha=date.today(), monto=monto, tipo=tipo,
-            categoria=categoria, metodo=metodo, referencia=referencia, notas=notas
+        result = PaymentService.register_payment(
+            user.idUser, motivo, monto, tipo,
+            categoria, metodo, referencia, notas
         )
-        db.session.add(pago); db.session.flush()
-    except Exception as e:
-        # Si falla por columnas desconocidas, reintentamos sin los campos nuevos
-        db.session.rollback()
-        try:
-            pago = Pago(
-                idUser=user_id, motivo=motivo, pagoFecha=date.today(), monto=monto, tipo=tipo
-            )
-            db.session.add(pago); db.session.flush()
-        except Exception as e2:
-            db.session.rollback()
-            return jsonify({"error": "db_insert_failed", "detail": str(e2)}), 500
-
-    # Historial y commit
-    db.session.add(Historial(idDinero=dinero.idDinero, idPago=pago.idPago))
-    try:
         db.session.commit()
+
+        return jsonify({
+            "mensaje": "Movimiento registrado",
+            **result
+        })
+    except ValueError as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 400
     except Exception as e:
         db.session.rollback()
-        return jsonify({"error": "db_commit_failed", "detail": str(e)}), 500
-
-    return jsonify({
-        "mensaje": "Movimiento registrado",
-        "tipo": tipo,
-        "categoria": categoria,
-        "metodo": metodo,
-        "nuevo_saldo": float(dinero.saldo),
-        "nueva_deuda_credito": float(getattr(dinero, "deuda_credito", 0) or 0),
-        "pago_id": pago.idPago
-    })
+        return jsonify({"error": "Error al registrar pago", "detail": str(e)}), 500
 
 @app.post("/api/pagar_tarjeta")
 def pagar_tarjeta():
-    """
-    Paga la tarjeta de crédito:
-      - descuenta del saldo (Dinero.saldo)
-      - reduce la deuda (Dinero.deuda_credito)
-      - registra movimiento (motivo 'Pago tarjeta', tipo 'debito')
-    Acepta sobrepago y lo ajusta al máximo posible.
-    Body: { monto: number }
-    """
     user, err = require_auth_user()
     if err:
         return err
 
     data = request.get_json(silent=True) or {}
-    # Validaciones de monto
     raw = data.get("monto", None)
     try:
         monto = float(raw)
-    except Exception:
+    except (TypeError, ValueError):
         return jsonify({"error": "Monto inválido o no enviado"}), 400
-    if monto <= 0:
-        return jsonify({"error": "Monto debe ser mayor a 0"}), 400
 
-    dinero = Dinero.query.filter_by(idUser=user.idUser).first()
-    if not dinero:
-        return jsonify({"error": "No hay saldo asociado"}), 404
-
-    saldo_actual = float(dinero.saldo or 0)
-    deuda_actual = float(dinero.deuda_credito or 0)
-
-    if deuda_actual <= 0:
-        return jsonify({"error": "No tienes deuda de tarjeta"}), 400
-    if saldo_actual <= 0:
-        return jsonify({"error": "Saldo insuficiente para pagar la tarjeta"}), 400
-
-    # Ajuste: si intenta pagar más de lo disponible o de la deuda, se reduce
-    pagable = min(monto, saldo_actual, deuda_actual)
-    ajuste = pagable < monto
-
-    # Aplicar
-    dinero.saldo = saldo_actual - pagable
-    dinero.deuda_credito = deuda_actual - pagable
-
-    pago = Pago(
-        idUser=user.idUser,
-        motivo="Pago tarjeta",
-        pagoFecha=date.today(),
-        monto=pagable,
-        tipo="debito",
-    )
-    db.session.add(pago)
-    db.session.flush()
-    db.session.add(Historial(idDinero=dinero.idDinero, idPago=pago.idPago))
-    db.session.commit()
-
-    return jsonify({
-        "mensaje": "Pago de tarjeta aplicado" + (" (ajustado)" if ajuste else ""),
-        "monto_pagado": pagable,
-        "ajustado": ajuste,
-        "nuevo_saldo": float(dinero.saldo),
-        "nueva_deuda_credito": float(dinero.deuda_credito or 0),
-        "pago_id": pago.idPago
-    })
+    try:
+        result = PaymentService.pay_credit_card(user.idUser, monto)
+        db.session.commit()
+        return jsonify(result)
+    except ValueError as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": "Error al pagar tarjeta", "detail": str(e)}), 500
 
 # ---------------------------------------------------------------------
 # Saldo actual (usado por el front)
@@ -524,16 +441,11 @@ def obtener_saldo_sesion():
     user, err = require_auth_user()
     if err:
         return err
-    dinero = Dinero.query.filter_by(idUser=user.idUser).first()
-    if not dinero:
-        return jsonify({"error": "Saldo no encontrado"}), 404
-    moneda = getattr(dinero, "moneda", None) or "MXN"
-    return jsonify({
-        "idUser": user.idUser,
-        "saldo": float(dinero.saldo),
-        "deuda_credito": float(getattr(dinero, "deuda_credito", 0) or 0),
-        "moneda": moneda
-    })
+    try:
+        balance_info = BalanceService.get_balance_info(user.idUser)
+        return jsonify(balance_info)
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 404
 
 # ---------------------------------------------------------------------
 # Dashboard + Movimientos (paginado)
@@ -598,40 +510,14 @@ def movimientos_sesion():
     except ValueError:
         return jsonify({"error": "Parámetros inválidos"}), 400
 
-    dinero = Dinero.query.filter_by(idUser=user.idUser).first()
+    dinero = BalanceService.get_balance_by_user(user.idUser)
     if not dinero:
         return jsonify({"error": "No se encontró saldo asociado"}), 404
 
-    base_q = (
-        db.session.query(Pago)
-        .join(Historial, Historial.idPago == Pago.idPago)
-        .filter(Historial.idDinero == dinero.idDinero)
+    result = PaymentService.get_payments_by_user(
+        user.idUser, dinero.idDinero, page, per_page, tipo if tipo else None
     )
-    if tipo in ("debito", "credito"):
-        base_q = base_q.filter(Pago.tipo == tipo)
-
-    total = base_q.count()
-    items = (
-        base_q.order_by(Pago.pagoFecha.desc(), Pago.idPago.desc())
-        .offset((page - 1) * per_page).limit(per_page).all()
-    )
-
-    movimientos = [{
-        "motivo": p.motivo,
-        "monto": float(p.monto),
-        "signo": "-" if (p.tipo or "debito") == "debito" else "+",
-        "fecha": p.pagoFecha.isoformat() if p.pagoFecha else None,
-        "tipo": p.tipo or "debito",
-        "categoria": getattr(p, "categoria", None),
-        "metodo": getattr(p, "metodo", None),
-    } for p in items]
-
-    return jsonify({
-        "page": page, "per_page": per_page, "total": total,
-        "pages": (total + per_page - 1) // per_page,
-        "has_prev": page > 1, "has_next": page * per_page < total,
-        "movimientos": movimientos
-    })
+    return jsonify(result)
 
 # ----- Errores en JSON (para que el front no reciba HTML) -----
 from werkzeug.exceptions import HTTPException
