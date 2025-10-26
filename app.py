@@ -173,6 +173,15 @@ with app.app_context():
             db.session.add(Historial(idDinero=saldo.idDinero, idPago=p.idPago))
         db.session.commit()
 
+    # --- Verificar usuarios sin saldo y crearles uno ---
+    users_sin_saldo = db.session.query(User).outerjoin(Dinero).filter(Dinero.idDinero == None).all()
+    if users_sin_saldo:
+        for u in users_sin_saldo:
+            nuevo_saldo = Dinero(saldo=0, deuda_credito=0, idUser=u.idUser)
+            db.session.add(nuevo_saldo)
+        db.session.commit()
+        print(f"[migracion] Se creó saldo para {len(users_sin_saldo)} usuario(s) sin registro de saldo")
+
 # ---------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------
@@ -518,6 +527,56 @@ def movimientos_sesion():
         user.idUser, dinero.idDinero, page, per_page, tipo if tipo else None
     )
     return jsonify(result)
+
+@app.post("/api/transferir")
+def transferir():
+    user, err = require_auth_user()
+    if err:
+        return err
+
+    data = request.get_json(silent=True) or {}
+    clabe = (data.get("clabe") or "").strip()
+    monto_raw = data.get("monto")
+    concepto = (data.get("concepto") or "Transferencia").strip()
+
+    if not clabe:
+        return jsonify({"error": "CLABE es requerida"}), 400
+    if len(clabe) != 18 or not clabe.isdigit():
+        return jsonify({"error": "CLABE debe tener 18 dígitos"}), 400
+
+    try:
+        monto = float(monto_raw)
+    except (TypeError, ValueError):
+        return jsonify({"error": "Monto inválido"}), 400
+
+    if monto <= 0:
+        return jsonify({"error": "Monto debe ser mayor a 0"}), 400
+
+    try:
+        result = PaymentService.register_payment(
+            user.idUser,
+            f"Transferencia: {concepto}",
+            monto,
+            "debito",
+            categoria="transferencia",
+            metodo="spei",
+            referencia=clabe
+        )
+        db.session.commit()
+
+        return jsonify({
+            "mensaje": "Transferencia exitosa",
+            "clabe_destino": clabe,
+            "monto": monto,
+            "concepto": concepto,
+            **result
+        })
+    except ValueError as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": "Error al realizar transferencia", "detail": str(e)}), 500
 
 # ----- Errores en JSON (para que el front no reciba HTML) -----
 from werkzeug.exceptions import HTTPException
