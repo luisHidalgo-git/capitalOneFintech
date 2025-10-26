@@ -1,19 +1,20 @@
 # models/historial.py
-from __future__ import annotations
 from . import db
-from sqlalchemy import ForeignKey
-from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
 
 class Historial(db.Model):
     __tablename__ = "historial"
-
     idHistorial = db.Column(db.Integer, primary_key=True)
-    idDinero = db.Column(db.Integer, ForeignKey("dinero.idDinero"), nullable=False, index=True)
-    idPago = db.Column(db.Integer, ForeignKey("pagos.idPago"), nullable=False, index=True)
+    idDinero = db.Column(db.Integer, db.ForeignKey("dinero.idDinero"), nullable=False)
+    idPago = db.Column(db.Integer, db.ForeignKey("pagos.idPago"), nullable=False)
 
-    # Relaciones
-    dinero = relationship("Dinero", back_populates="historial")
-    pago = relationship("Pago", back_populates="historial")
+    pago = db.relationship("Pago", backref="historial_items", lazy=True)
+    dinero = db.relationship("Dinero", backref="historial_items", lazy=True)
 
-    def __repr__(self):
-        return f"<Historial {self.idHistorial} d={self.idDinero} p={self.idPago}>"
+    # NUEVO: auditoría
+    created_at = db.Column(db.DateTime, nullable=False, server_default=func.now())
+
+    __table_args__ = (
+        db.Index("idx_historial_dinero", "idDinero"),
+        db.Index("idx_historial_pago", "idPago"),
+    )

@@ -1,22 +1,20 @@
 # models/pago.py
-from __future__ import annotations
-from . import db
-from sqlalchemy import ForeignKey
-from sqlalchemy.orm import relationship
-from sqlalchemy.types import Numeric, Date
+from . import db, TimeStampedMixin
+from sqlalchemy.sql import func
+from sqlalchemy import CheckConstraint, Index
 
-class Pago(db.Model):
+class Pago(db.Model, TimeStampedMixin):
     __tablename__ = "pagos"
-
     idPago = db.Column(db.Integer, primary_key=True)
-    idUser = db.Column(db.Integer, ForeignKey("users.idUser"), nullable=False, index=True)
+    idUser = db.Column(db.Integer, db.ForeignKey("users.idUser"), nullable=False)
     motivo = db.Column(db.String(200), nullable=False)
-    pagoFecha = db.Column(Date, nullable=False)
-    monto = db.Column(Numeric(12, 2), nullable=False)
+    pagoFecha = db.Column(db.Date, nullable=False, server_default=func.current_date())
+    monto = db.Column(db.Numeric(12, 2), nullable=False)
+    # tipo (debito|credito)
+    tipo = db.Column(db.String(10), nullable=False, default="debito")
 
-    # Relaciones
-    user = relationship("User", back_populates="pagos")
-    historial = relationship("Historial", back_populates="pago", cascade="all, delete-orphan")
-
-    def __repr__(self):
-        return f"<Pago {self.idPago} monto={self.monto}>"
+    __table_args__ = (
+        CheckConstraint("tipo IN ('debito','credito')", name="ck_pagos_tipo"),
+        Index("ix_pagos_user_fecha", "idUser", "pagoFecha"),
+        Index("ix_pagos_tipo", "tipo"),
+    )

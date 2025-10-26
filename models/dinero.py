@@ -1,19 +1,21 @@
 # models/dinero.py
-from __future__ import annotations
 from . import db
-from sqlalchemy import ForeignKey
-from sqlalchemy.orm import relationship
-from sqlalchemy.types import Numeric
+from sqlalchemy.sql import func
 
 class Dinero(db.Model):
     __tablename__ = "dinero"
-
     idDinero = db.Column(db.Integer, primary_key=True)
-    saldo = db.Column(Numeric(12, 2), nullable=False, default=0)
-    idUser = db.Column(db.Integer, ForeignKey("users.idUser"), nullable=False, index=True)
+    saldo = db.Column(db.Numeric(12, 2), nullable=False, default=0)
+    idUser = db.Column(db.Integer, db.ForeignKey("users.idUser"), nullable=False)
 
-    user = relationship("User", back_populates="dinero")
-    historial = relationship("Historial", back_populates="dinero", cascade="all, delete-orphan")
+    # EXISTENTE: saldo usado de la tarjeta de crédito
+    deuda_credito = db.Column(db.Numeric(12, 2), nullable=False, default=0)
 
-    def __repr__(self):
-        return f"<Dinero {self.idDinero} saldo={self.saldo}>"
+    # NUEVO: moneda + auditoría
+    moneda = db.Column(db.String(3), nullable=False, default="MXN")
+    created_at = db.Column(db.DateTime, nullable=False, server_default=func.now())
+    updated_at = db.Column(db.DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
+
+    __table_args__ = (
+        db.Index("idx_dinero_user", "idUser"),
+    )
