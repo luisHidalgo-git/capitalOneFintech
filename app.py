@@ -229,6 +229,91 @@ def login():
         "idUser": user.idUser, "nombre": user.nombre, "apellido": user.apellido, "correo": user.correo
     }})
 
+@app.post("/api/register")
+def register():
+    """
+    Registra un nuevo usuario en el sistema.
+    Body: {
+        "nombre": str,
+        "apellido": str,
+        "correo": str (email único),
+        "contrasena": str,
+        "numeroTelefono": str (opcional),
+        "biometricos": str (opcional),
+        "saldo_inicial": float (opcional, default 0)
+    }
+    """
+    data = request.get_json(silent=True)
+    if not data:
+        return jsonify({"error": "Falta el cuerpo de la petición"}), 400
+
+    # Validaciones básicas
+    nombre = (data.get("nombre") or "").strip()
+    apellido = (data.get("apellido") or "").strip()
+    correo = (data.get("correo") or "").strip().lower()
+    contrasena = (data.get("contrasena") or "").strip()
+    numeroTelefono = (data.get("numeroTelefono") or "").strip()
+    biometricos = (data.get("biometricos") or "").strip()
+    saldo_inicial = float(data.get("saldo_inicial", 0))
+
+    if not nombre:
+        return jsonify({"error": "El nombre es requerido"}), 400
+    if not apellido:
+        return jsonify({"error": "El apellido es requerido"}), 400
+    if not correo:
+        return jsonify({"error": "El correo es requerido"}), 400
+    if not contrasena:
+        return jsonify({"error": "La contraseña es requerida"}), 400
+    if len(contrasena) < 4:
+        return jsonify({"error": "La contraseña debe tener al menos 4 caracteres"}), 400
+
+    # Validar formato de correo (básico)
+    if "@" not in correo or "." not in correo.split("@")[1]:
+        return jsonify({"error": "Formato de correo inválido"}), 400
+
+    # Verificar que el correo no exista
+    existing_user = User.query.filter_by(correo=correo).first()
+    if existing_user:
+        return jsonify({"error": "El correo ya está registrado"}), 409
+
+    try:
+        # Crear usuario
+        nuevo_usuario = User(
+            nombre=nombre,
+            apellido=apellido,
+            correo=correo,
+            contrasena="",  # Se establece con set_password
+            numeroTelefono=numeroTelefono or None,
+            biometricos=biometricos or None
+        )
+        nuevo_usuario.set_password(contrasena)
+        db.session.add(nuevo_usuario)
+        db.session.flush()
+
+        # Crear saldo inicial
+        dinero = Dinero(
+            saldo=max(0, saldo_inicial),
+            deuda_credito=0,
+            idUser=nuevo_usuario.idUser
+        )
+        db.session.add(dinero)
+        db.session.commit()
+
+        return jsonify({
+            "mensaje": "Usuario registrado exitosamente",
+            "usuario": {
+                "idUser": nuevo_usuario.idUser,
+                "nombre": nuevo_usuario.nombre,
+                "apellido": nuevo_usuario.apellido,
+                "correo": nuevo_usuario.correo,
+                "saldo_inicial": float(dinero.saldo)
+            }
+        }), 201
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": "Error al registrar usuario", "detail": str(e)}), 500
+
 @app.post("/api/logout")
 def logout():
     session.clear()

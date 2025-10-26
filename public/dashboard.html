@@ -112,7 +112,10 @@
   .modal.show,.modal-backdrop.show{display:grid}
   .modal-card{width:min(560px,92vw); background:#fff; border:1px solid #e5e7eb; border-radius:18px; box-shadow:0 20px 60px rgba(0,0,0,.25); overflow:hidden}
   .modal-header{padding:14px 16px; font-weight:800; color:#003a6d; border-bottom:1px solid #e5e7eb}
-  .modal-body{padding:16px; color:#0f1b2d}
+  .modal-body{padding:16px; color:#0f1b2d; white-space:pre-wrap; line-height:1.6}
+  .modal-body strong{color:var(--brand); font-weight:700}
+  .modal-body ul{margin:8px 0; padding-left:20px}
+  .modal-body li{margin:6px 0}
   .modal-footer{display:flex; gap:10px; justify-content:flex-end; padding:14px 16px; background:#f8fafc; border-top:1px solid #e5e7eb}
   .mbtn{padding:10px 14px; border-radius:10px; border:1px solid #d6dee8; background:#fff; cursor:pointer}
   .mbtn.primary{background:linear-gradient(90deg,#003a6d,#0a6cbe); color:#fff; border-color:transparent}
@@ -289,7 +292,7 @@
 <div id="confirmModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
   <div class="modal-card">
     <div class="modal-header" id="confirmTitle">Confirmar acción</div>
-    <div class="modal-body"><div id="confirmMsg" style="white-space:pre-wrap"></div></div>
+    <div class="modal-body"><div id="confirmMsg"></div></div>
     <div class="modal-footer">
       <button class="mbtn" id="confirmNo">Cancelar</button>
       <button class="mbtn primary" id="confirmYes">Continuar</button>
@@ -368,7 +371,13 @@
   function uiConfirm(message, title='Confirmar'){
     return new Promise(resolve=>{
       $('#confirmTitle').textContent = title;
-      $('#confirmMsg').textContent = message;
+      const msgEl = $('#confirmMsg');
+      // Si el mensaje contiene HTML, usamos innerHTML; si no, textContent
+      if(message.includes('<strong>') || message.includes('<ul>')){
+        msgEl.innerHTML = message;
+      } else {
+        msgEl.textContent = message;
+      }
       openModal('confirmModal');
       const yes = $('#confirmYes'), no = $('#confirmNo');
       const cleanup = ()=>{ yes.onclick=no.onclick=null; closeModal('confirmModal'); };
@@ -479,9 +488,9 @@
     const info = await uiPayDialog();
     if(!info) return;
 
-    const rs = await fetch('/api/saldo'); 
+    const rs = await fetch('/api/saldo');
     if(!rs.ok){ showToast('Error','No se pudo leer tu saldo','error'); return; }
-    const sd = await rs.json(); 
+    const sd = await rs.json();
     const saldo = Number(sd.saldo||0);
 
     const ev = await fetch('/api/evaluar', {
@@ -492,7 +501,8 @@
     if(!ev.ok){ showToast('Error al evaluar', ed.error || 'Intenta de nuevo', 'error'); return; }
 
     if(ed.alerta){
-      const ok = await uiConfirm(ed.mensaje || 'Este gasto puede ser riesgoso. ¿Continuar?', '⚠️ Alerta de gasto');
+      const mensaje = formatAIMessage(ed.mensaje || 'Este gasto puede ser riesgoso. ¿Continuar?');
+      const ok = await uiConfirm(mensaje, '⚠️ Alerta financiera');
       if(!ok) return;
     }
 
@@ -511,6 +521,18 @@
     showToast('Movimiento registrado',
               `Saldo: ${fmt(pd.nuevo_saldo)} · Deuda tarjeta: ${fmt(pd.nueva_deuda_credito||0)}`,
               'success', 4200);
+  }
+
+  // Formatea el mensaje de la IA para mejor legibilidad
+  function formatAIMessage(msg){
+    if(!msg) return msg;
+    // Convierte bullet points en HTML
+    let formatted = msg
+      .replace(/^(\d+\.)\s/gm, '<strong>$1</strong> ')
+      .replace(/^-\s/gm, '• ')
+      .replace(/\n\n/g, '\n')
+      .replace(/Recomendaciones:/gi, '<strong>Recomendaciones:</strong>');
+    return formatted;
   }
 
   // -------- UI: sidebar + ripple + tarjeta block ----------
@@ -565,7 +587,23 @@
 
   // -------- acciones --------
   document.getElementById('qaPagos').addEventListener('click', quickPayFlow);
-  document.getElementById('qaDetalles').addEventListener('click', ()=>showToast('Próximamente','Detalles de cuenta','info'));
+  document.getElementById('qaDetalles').addEventListener('click', async ()=>{
+    const rs = await fetch('/api/saldo');
+    if(!rs.ok){ showToast('Error','No se pudo cargar información','error'); return; }
+    const sd = await rs.json();
+    const msg = `Saldo disponible: ${fmt(sd.saldo)}\nDeuda tarjeta: ${fmt(sd.deuda_credito)}\nMoneda: ${sd.moneda}`;
+    await uiConfirm(msg, 'Detalles de cuenta');
+  });
+
+  document.getElementById('detallesBtn')?.addEventListener('click', async ()=>{
+    const rs = await fetch('/api/saldo');
+    if(!rs.ok){ showToast('Error','No se pudo cargar información','error'); return; }
+    const sd = await rs.json();
+    const limite = CREDIT_LIMIT;
+    const disponible = limite - Number(sd.deuda_credito||0);
+    const msg = `Tarjeta Visa ••7789\n\nLínea de crédito: ${fmt(limite)}\nDeuda actual: ${fmt(sd.deuda_credito)}\nDisponible: ${fmt(disponible)}\n\nCorte: 28 Sep\nPago mínimo: ${fmt(sd.deuda_credito * 0.05)}\nVencimiento: 15 Oct`;
+    await uiConfirm(msg, 'Detalles de tarjeta');
+  });
   document.getElementById('btnPrev').addEventListener('click', ()=> loadMovs(MOV_PAGE - 1));
   document.getElementById('btnNext').addEventListener('click', ()=> loadMovs(MOV_PAGE + 1));
   document.getElementById('logoutBtn').addEventListener('click', async ()=>{ await fetch('/api/logout',{method:'POST'}); location.href='/'; });
@@ -574,6 +612,23 @@
   document.getElementById('payCardBtn')?.addEventListener('click', async ()=>{
     const monto = await uiCardPayDialog();
     if(!monto) return;
+
+    // Verificar saldo antes de pagar
+    const rs = await fetch('/api/saldo');
+    if(!rs.ok){ showToast('Error','No se pudo verificar tu saldo','error'); return; }
+    const sd = await rs.json();
+    const saldoActual = Number(sd.saldo||0);
+    const deudaActual = Number(sd.deuda_credito||0);
+
+    if(saldoActual <= 0){
+      showToast('Saldo insuficiente','No tienes saldo disponible para pagar la tarjeta','error');
+      return;
+    }
+
+    if(deudaActual <= 0){
+      showToast('Sin deuda','No tienes deuda de tarjeta por pagar','info');
+      return;
+    }
 
     const r = await fetch('/api/pagar_tarjeta', {
       method:'POST', headers:{'Content-Type':'application/json'},
@@ -585,7 +640,11 @@
     $('#totalAmount').textContent = fmt(d.nuevo_saldo);
     updateCreditUI(d.nueva_deuda_credito || 0);
     await loadMovs(MOV_PAGE);
-    showToast('Pago aplicado','Tu tarjeta fue pagada correctamente','success');
+
+    const msg = d.ajustado
+      ? `Se pagó ${fmt(d.monto_pagado)} (ajustado al máximo disponible)`
+      : `Se pagó ${fmt(d.monto_pagado)} correctamente`;
+    showToast('Pago aplicado', msg, 'success', 4500);
   });
 
   // -------- init --------

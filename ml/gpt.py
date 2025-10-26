@@ -48,12 +48,12 @@ def generar_mensaje_gpt(
                 contexto_historial += f"- Últimos gastos: {', '.join(motivos)}\n"
 
         prompt = (
-            "Eres un asesor financiero personal y empático que conoce bien los hábitos del usuario. "
-            "Basándote en su historial de gastos, proporciona un mensaje personalizado que:\n"
-            "1. Reconozca sus patrones de gasto\n"
-            "2. Explique por qué este gasto podría ser riesgoso AHORA\n"
-            "3. Ofrezca 2-3 recomendaciones específicas y accionables\n"
-            "4. Sea cercano pero profesional\n\n"
+            "Eres un asesor financiero personal y empático. Genera un mensaje de alerta que:\n"
+            "1. En 1-2 líneas: Explica el riesgo principal de este gasto basándote en el saldo y patrones\n"
+            "2. Agrega una sección 'Recomendaciones:' con 2-3 puntos concretos y accionables\n"
+            "3. Usa un tono cercano pero profesional\n"
+            "4. Sé conciso (máximo 200 palabras)\n"
+            "5. Usa números y datos específicos del usuario\n\n"
             f"Situación actual:\n"
             f"- Saldo disponible: ${saldo:,.2f}\n"
             f"- Suscripciones activas: {suscripciones}\n"
@@ -96,38 +96,49 @@ def _generar_mensaje_fallback(
 ) -> str:
     """Genera un mensaje personalizado sin usar GPT"""
     porcentaje = (nuevo_gasto / saldo * 100) if saldo > 0 else 100
+    saldo_restante = saldo - nuevo_gasto
 
     # Análisis del historial
+    patron = ""
     if historial_pagos and len(historial_pagos) > 0:
         montos = [p.get("monto", 0) for p in historial_pagos]
         promedio = sum(montos) / len(montos)
         total_pagos = len(historial_pagos)
 
         if nuevo_gasto > promedio * 1.5:
-            patron = f"Este gasto (${nuevo_gasto:,.2f}) es significativamente mayor a tu promedio habitual (${promedio:,.2f}). "
+            patron = f"Este gasto de ${nuevo_gasto:,.2f} supera tu promedio habitual (${promedio:,.2f}). "
         elif total_pagos >= 5:
-            patron = f"Basándome en tus últimos {total_pagos} pagos, "
+            patron = f"Analizando tus últimos {total_pagos} pagos, "
         else:
-            patron = "Estoy aprendiendo tus hábitos de gasto. "
+            patron = "Estoy aprendiendo sobre tus hábitos. "
     else:
-        patron = "Este es uno de tus primeros gastos. "
+        patron = "Este es tu primer gasto registrado. "
 
     tipo = "esencial" if esencial else "no esencial"
 
     mensaje = (
-        f"⚠️ Alerta de gasto\n\n"
         f"{patron}"
-        f"Este gasto {tipo} representa el {porcentaje:.1f}% de tu saldo actual.\n\n"
-        f"Recomendaciones:\n"
+        f"Este gasto {tipo} representa el <strong>{porcentaje:.1f}%</strong> de tu saldo. "
+        f"Te quedarían ${saldo_restante:,.2f}.\n\n"
+        f"<strong>Recomendaciones:</strong>\n"
     )
 
-    if porcentaje > 40:
-        mensaje += "1. Considera reducir el monto o buscar alternativas más económicas\n"
-    if suscripciones > 5:
-        mensaje += f"2. Tienes {suscripciones} suscripciones activas. Revisa cuáles realmente usas\n"
-    if not esencial:
-        mensaje += "3. Este gasto no es esencial. ¿Puedes posponerlo?\n"
-    else:
-        mensaje += "3. Si es esencial, busca la opción más económica disponible\n"
+    recs = []
+    if porcentaje > 50:
+        recs.append("• Considera reducir el monto o dividirlo en varios pagos")
+    elif porcentaje > 40:
+        recs.append("• Busca alternativas más económicas para este gasto")
 
+    if suscripciones > 5:
+        recs.append(f"• Tienes {suscripciones} suscripciones activas. Revisa cuáles realmente usas")
+
+    if not esencial:
+        recs.append("• Este gasto no es esencial. ¿Puedes posponerlo hasta recibir más ingresos?")
+    else:
+        recs.append("• Si es esencial, compara precios entre diferentes proveedores")
+
+    if porcentaje > 30:
+        recs.append(f"• Considera mantener al menos ${saldo*0.3:,.2f} como fondo de emergencia")
+
+    mensaje += "\n".join(recs[:3])  # Máximo 3 recomendaciones
     return mensaje
