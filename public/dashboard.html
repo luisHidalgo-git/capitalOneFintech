@@ -172,12 +172,6 @@
 
     <div class="spacer"></div>
 
-    <button class="btn-card sb-btn" data-route="ajustes">
-      <span class="btn-ico">
-        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a2 2 0 0 0 .3 2.1l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1"/></svg>
-      </span>
-      <span class="btn-titles"><span class="title">Ajustes</span><span class="sub">Preferencias</span></span>
-    </button>
   </aside>
   <div class="overlay" id="overlay"></div>
 
@@ -191,14 +185,13 @@
       <span class="app-title">Banca Web</span>
     </div>
     <div class="top-right">
-      <button class="iconbtn" id="notifBtn">🔔</button>
       <button class="iconbtn" id="logoutBtn" title="Cerrar sesión">⎋</button>
     </div>
   </header>
 
   <!-- ===== MAIN ===== -->
   <main>
-    <section id="view-dashboard" class="view active">
+    <section id="view-dashboard" class="view" style="display:block">
       <div class="grid">
         <!-- Saldo + Acciones rápidas -->
         <article class="card card--saldo">
@@ -280,6 +273,63 @@
           </div>
         </article>
 
+      </div>
+    </section>
+
+    <section id="view-cuentas" class="view" style="display:none">
+      <div class="card">
+        <h3>Cuentas</h3>
+        <div style="display:grid;gap:16px;margin-top:20px">
+          <div style="padding:20px;background:#fff;border:1px solid var(--border);border-radius:16px">
+            <div style="font-weight:800;font-size:18px;color:var(--brand)">Cuenta Corriente</div>
+            <div style="color:var(--muted);font-size:14px;margin:8px 0">•••• 1234</div>
+            <div style="font-size:24px;font-weight:700;margin-top:12px" id="cuentaSaldo">$ 0.00</div>
+            <div style="margin-top:12px;font-size:13px;color:var(--muted)">CLABE: 012180001234567890</div>
+          </div>
+          <div style="padding:20px;background:#fff;border:1px solid var(--border);border-radius:16px">
+            <div style="font-weight:800;font-size:18px;color:var(--brand)">Ahorro</div>
+            <div style="color:var(--muted);font-size:14px;margin:8px 0">•••• 9981</div>
+            <div style="font-size:24px;font-weight:700;margin-top:12px">$ 0.00</div>
+            <div style="margin-top:12px;font-size:13px;color:var(--muted)">CLABE: 012180009981234567</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="view-transferir" class="view" style="display:none">
+      <div class="card">
+        <h3>Transferir</h3>
+        <div style="margin-top:20px">
+          <div class="form-row">
+            <label>Cuenta destino (CLABE)</label>
+            <input type="text" placeholder="18 dígitos">
+          </div>
+          <div class="form-row">
+            <label>Monto</label>
+            <input type="number" placeholder="0.00">
+          </div>
+          <div class="form-row">
+            <label>Concepto</label>
+            <input type="text" placeholder="Motivo de la transferencia">
+          </div>
+          <button class="mbtn primary" style="margin-top:16px;width:100%">Transferir</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="view-movimientos" class="view" style="display:none">
+      <div class="card">
+        <h3>Historial de movimientos</h3>
+        <div class="tx-list" id="txListFull" style="margin-top:20px"></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:12px">
+          <button id="btnPrevFull" class="qbtn" style="padding:8px 12px; border-radius:12px">
+            <span class="btn-titles"><span class="title">Anterior</span></span>
+          </button>
+          <div class="muted" id="pagerInfoFull">Página 1 de 1</div>
+          <button id="btnNextFull" class="qbtn" style="padding:8px 12px; border-radius:12px">
+            <span class="btn-titles"><span class="title">Siguiente</span></span>
+          </button>
+        </div>
       </div>
     </section>
   </main>
@@ -448,6 +498,10 @@
     $('#totalAmount').textContent = fmt(d.saldo);
     $('#accountsLine').textContent = 'Cuentas: Corriente ••1234 · Ahorro ••9981';
     updateCreditUI(d.deuda_credito || 0);
+
+    // Actualizar vista de cuentas
+    const cuentaSaldo = $('#cuentaSaldo');
+    if(cuentaSaldo) cuentaSaldo.textContent = fmt(d.saldo);
   }
 
   // ---- Paginación de movimientos ----
@@ -513,8 +567,7 @@
     const pd = await rp.json().catch(()=> ({}));
     if(!rp.ok){ showToast('No se registró', pd.error || 'Error al registrar pago','error'); return; }
 
-    $('#totalAmount').textContent = fmt(pd.nuevo_saldo);
-    updateCreditUI(pd.nueva_deuda_credito || 0);
+    await loadDashboard();
     await loadMovs(MOV_PAGE);
 
     showToast('Movimiento registrado',
@@ -543,6 +596,42 @@
   }
   burger?.addEventListener('click', toggleSidebar);
   overlay.addEventListener('click', toggleSidebar);
+
+  // Navegación entre vistas
+  document.querySelectorAll('.sb-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const route = btn.dataset.route;
+      if(!route) return;
+
+      // Marcar botón activo
+      document.querySelectorAll('.sb-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+
+      // Ocultar todas las vistas
+      document.querySelectorAll('.view').forEach(v => v.style.display = 'none');
+
+      // Mostrar vista seleccionada
+      const view = $(`#view-${route}`);
+      if(view){
+        view.style.display = 'block';
+
+        // Cargar datos según la vista
+        if(route === 'dashboard'){
+          await loadDashboard();
+          await loadMovs(1);
+        } else if(route === 'cuentas'){
+          await loadDashboard();
+        } else if(route === 'movimientos'){
+          await loadMovsFull(1);
+        }
+      }
+
+      // Cerrar sidebar en móvil
+      if(window.innerWidth <= 880){
+        toggleSidebar();
+      }
+    });
+  });
   function handleResize(){
     if (window.innerWidth > 880){ sidebar.classList.remove('open'); overlay.classList.remove('show'); burger.style.display='none'; }
     else { burger.style.display='grid'; burger.textContent='☰'; }
@@ -585,7 +674,10 @@
   });
 
   // -------- acciones --------
-  document.getElementById('qaPagos').addEventListener('click', quickPayFlow);
+  document.getElementById('qaPagos').addEventListener('click', async () => {
+    await quickPayFlow();
+    await loadDashboard();
+  });
   document.getElementById('qaDetalles').addEventListener('click', async ()=>{
     const rs = await fetch('/api/saldo');
     if(!rs.ok){ showToast('Error','No se pudo cargar información','error'); return; }
@@ -606,6 +698,39 @@
   document.getElementById('btnPrev').addEventListener('click', ()=> loadMovs(MOV_PAGE - 1));
   document.getElementById('btnNext').addEventListener('click', ()=> loadMovs(MOV_PAGE + 1));
   document.getElementById('logoutBtn').addEventListener('click', async ()=>{ await fetch('/api/logout',{method:'POST'}); location.href='/'; });
+
+  // Movimientos vista completa
+  let MOV_PAGE_FULL = 1;
+  async function loadMovsFull(page = 1){
+    const r = await fetch(`/api/movimientos?page=${page}&per_page=20`);
+    const d = await r.json();
+    if(!r.ok){ showToast('Error','No se pudieron cargar los movimientos','error'); return; }
+
+    MOV_PAGE_FULL = d.page;
+    const list = $('#txListFull'); list.innerHTML = '';
+    (d.movimientos||[]).forEach(m=>{
+      const div = document.createElement('div'); div.className='tx';
+      const initials = (m.motivo||'?').trim().split(/\s+/).slice(0,2).map(s=>s[0]).join('').toUpperCase();
+      const fecha = (m.fecha||'').substring(0,10);
+      const isIn = (m.tipo||'debito') === 'credito';
+      const sideClass = isIn ? 'in' : 'out';
+      const sign = m.signo || (isIn?'+':'-');
+      div.innerHTML = `
+        <div style="display:flex; align-items:center; gap:12px">
+          <div class="avatar">${initials}</div>
+          <div><div>${m.motivo}</div><div class="meta">${fecha} · ${m.tipo}</div></div>
+        </div>
+        <div class="amount ${sideClass}">${sign} ${fmt(Math.abs(m.monto))}</div>
+      `;
+      list.appendChild(div);
+    });
+
+    $('#pagerInfoFull').textContent = `Página ${d.page} de ${d.pages || 1}`;
+    $('#btnPrevFull').disabled = !d.has_prev;
+    $('#btnNextFull').disabled = !d.has_next;
+  }
+  document.getElementById('btnPrevFull').addEventListener('click', ()=> loadMovsFull(MOV_PAGE_FULL - 1));
+  document.getElementById('btnNextFull').addEventListener('click', ()=> loadMovsFull(MOV_PAGE_FULL + 1));
 
   // Botón Pagar tarjeta (modal)
   document.getElementById('payCardBtn')?.addEventListener('click', async ()=>{
@@ -636,8 +761,7 @@
     const d = await r.json().catch(()=> ({}));
     if(!r.ok){ showToast('No se pudo pagar la tarjeta', d.error || 'Intenta más tarde','error'); return; }
 
-    $('#totalAmount').textContent = fmt(d.nuevo_saldo);
-    updateCreditUI(d.nueva_deuda_credito || 0);
+    await loadDashboard();
     await loadMovs(MOV_PAGE);
 
     const msg = d.ajustado

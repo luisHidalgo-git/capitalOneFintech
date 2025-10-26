@@ -25,10 +25,14 @@ class BalanceService:
             current_saldo = float(dinero.saldo or 0)
             if current_saldo < monto:
                 raise ValueError("Saldo insuficiente")
-            dinero.saldo = Decimal(str(current_saldo - monto))
+            nuevo_saldo = current_saldo - monto
+            dinero.saldo = Decimal(str(nuevo_saldo))
         elif tipo == "credito":
             current_deuda = float(dinero.deuda_credito or 0)
-            dinero.deuda_credito = Decimal(str(current_deuda + monto))
+            nueva_deuda = current_deuda + monto
+            dinero.deuda_credito = Decimal(str(nueva_deuda))
+
+        db.session.flush()
 
     @staticmethod
     def pay_credit_card(dinero: Dinero, monto: float) -> dict:
