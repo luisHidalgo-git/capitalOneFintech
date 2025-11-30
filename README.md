@@ -37,6 +37,39 @@ cd <nombre-del-proyecto>
 ```bash
 python -m venv venv
 ```
+### 2. Registrar un Pago
+
+**Endpoint**: `POST /api/pago`
+
+**Notas**: Este endpoint requiere un usuario autenticado (usa la sesión). No envíes `idUser` en el cuerpo: el servidor toma el usuario desde la sesión.
+
+**Body** (JSON) — campos principales:
+
+```json
+{
+    "motivo": "Compra de supermercado",
+    "monto": 250.5,
+    "tipo": "debito",            
+    "categoria": "hogar",        
+    "metodo": "tarjeta",        
+    "referencia": "xxxx-1234",  
+    "notas": "Compra semanal"
+}
+```
+
+**Respuesta**:
+
+```json
+{
+    "mensaje": "Movimiento registrado",
+    "pago_id": 15,
+    "tipo": "debito",
+    "categoria": "hogar",
+    "metodo": "tarjeta",
+    "nuevo_saldo": 3949.5,
+    "nueva_deuda_credito": 0.0
+}
+```
 
 Activar el entorno virtual:
 
@@ -46,6 +79,22 @@ Activar el entorno virtual:
 ### Paso 3: Instalar Dependencias
 
 ```bash
+### 3. Consultar Saldo
+
+**Endpoint**: `GET /api/saldo`
+
+**Notas**: Esta ruta utiliza la sesión autenticada para determinar el usuario actual. Debes iniciar sesión (o enviar la cookie de sesión) antes de consultar el saldo. No acepta `user_id` en la URL.
+
+**Respuesta**:
+
+```json
+{
+        "idUser": 1,
+        "saldo": 3949.5,
+        "deuda_credito": 1200.0,
+        "moneda": "MXN"
+}
+```
 pip install -r requirements.txt
 ```
 
@@ -68,6 +117,43 @@ OPENAI_API_KEY=tu_api_key_opcional
 ### Paso 5: Iniciar la Aplicación
 
 ```bash
+### 4. Crear Nuevo Usuario
+
+**Endpoint**: `POST /api/register`
+
+**Body** (JSON) — campos requeridos/esperados:
+
+```json
+{
+    "nombre": "María López",
+    "apellido": "Pérez",
+    "correo": "maria@example.com",
+    "contrasena": "secreto123",
+    "numeroTelefono": "5550001111",    
+    "biometricos": "opcional",
+    "saldo_inicial": 5000.0
+}
+```
+
+**Notas**:
+- El campo obligatorio para el correo se llama `correo` (no `email`).
+- La contraseña debe enviarse en `contrasena` y tener al menos 4 caracteres.
+- `saldo_inicial` es opcional (por defecto 0).
+
+**Respuesta** (201):
+
+```json
+{
+    "mensaje": "Usuario registrado exitosamente",
+    "usuario": {
+        "idUser": 2,
+        "nombre": "María López",
+        "apellido": "Pérez",
+        "correo": "maria@example.com",
+        "saldo_inicial": 5000.0
+    }
+}
+```
 python app.py
 ```
 
